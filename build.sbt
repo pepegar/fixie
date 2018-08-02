@@ -34,6 +34,7 @@ lazy val commonSettings = Seq(
   addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full),
   libraryDependencies ++= Seq(
     "org.typelevel"     %% "cats-core"   % catsV,
+    "org.typelevel" %% "kittens" % "1.1.0",
     "io.higherkindness" %% "droste-core" % drosteV
   )
 )

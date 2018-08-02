@@ -82,10 +82,21 @@ object fixie {
       val nonRecursiveAdt: ClassDef =
         q"""sealed trait $NonRecursiveAdtName[..${clait.tparams}, $A] extends Product with Serializable"""
 
+      val functorInstance = {
+        q"""
+implicit def functorInstance[..${clait.tparams}]: cats.Functor[({ type λ[α] = $NonRecursiveAdtName[..${clait.tparams
+          .map(_.name)}, α] })#λ] = {
+  import cats.derived._, auto.functor._
+  semi.functor
+}
+"""
+      }
+
       val fixieModule: ModuleDef = q"""
 object fixie {
   $nonRecursiveAdt
   ..$NonRecursiveAdtCases
+  $functorInstance
 }
 """
 
