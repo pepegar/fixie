@@ -1,6 +1,4 @@
-package com.pepegar
-
-import fixie._
+package fixie
 // import cats._, cats.derived._
 
 // sealed trait MyListF[A, REC]
@@ -20,10 +18,10 @@ import fixie._
 //   case class Nil[A]()                          extends MyList[A]
 // }
 
-@fixie sealed trait MyList
-object MyList {
-  case class Cons(head: Int, tail: MyList) extends MyList
-  case object Nil                          extends MyList
+@fixie sealed trait MyIntList
+object MyIntList {
+  case class Cons(head: Int, tail: MyIntList) extends MyIntList
+  case object Nil                             extends MyIntList
 }
 
 object App extends App {}
