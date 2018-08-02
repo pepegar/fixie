@@ -36,7 +36,8 @@ lazy val commonSettings = Seq(
     "org.typelevel"     %% "cats-core"   % catsV,
     "org.typelevel"     %% "kittens"     % "1.1.0",
     "io.higherkindness" %% "droste-core" % drosteV
-  )
+  ),
+  scalacOptions -= "-Ywarn-unused:patvars"
 )
 
 lazy val releaseSettings = {

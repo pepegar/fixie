@@ -23,10 +23,16 @@ object fixie {
       val clait: ClassDef      = inputs.collect({ case c: ClassDef  => c }).head
       val companion: ModuleDef = inputs.collect({ case c: ModuleDef => c }).head
 
-      val A: TypeName                   = c.freshName(TypeName("A"))
+      val A: TypeName                     = c.freshName(TypeName("A"))
+      val claitTypeParams                 = clait.tparams
+      val claitTypeParamNames             = claitTypeParams.map(_.name)
+      val claitTypeParamNamesAsTrees      = claitTypeParams.map(x => Ident(x.name))
+      val claitTypeParamNamesWithA        = claitTypeParamNames :+ A
+      val claitTypeParamNamesWithAAsTrees = claitTypeParamNamesWithA.map(x => Ident(x))
+
       val NonRecursiveAdtName: TypeName = TypeName(s"${clait.name}F")
       val NonRecursiveAdtFullName: AppliedTypeTree =
-        AppliedTypeTree(Ident(NonRecursiveAdtName), (clait.tparams.map(_.name) :+ A).map(x => Ident(x)))
+        AppliedTypeTree(Ident(NonRecursiveAdtName), claitTypeParamNamesWithAAsTrees)
 
       def isSealed(classOrTrait: ClassDef): Boolean =
         classOrTrait.mods.hasFlag(TRAIT) ||
@@ -41,8 +47,8 @@ object fixie {
       // Things to do:
       // 1. [X] create the parametrized Adt declaration
       // 2. [X] create all the cases for it
-      // 3. [ ] create the functor instance
-      // 4. [ ] create conversions between recursive & nonrecursive ADT
+      // 3. [X] create the functor instance
+      // 4. [X] create conversions between recursive & nonrecursive ADT
 
       val AdtCases = companion.impl.body.collect(isCase)
 
@@ -60,19 +66,22 @@ object fixie {
         q"case class $Name[..${clait.tparams}, $A]() extends $NonRecursiveAdtFullName"
       }
 
-      def convertCaseClass(caseClass: ClassDef): ClassDef = {
-        val Name: TypeName = TypeName(s"${caseClass.name}F")
-
-        val params: List[ValDef] = caseClass.impl.body
+      def getCaseClassParams(caseClass: ClassDef): List[ValDef] =
+        caseClass.impl.body
           .collect({
             case v: ValDef if v.mods.hasFlag(PARAMACCESSOR) && v.mods.hasFlag(CASEACCESSOR) => v
           })
           .map(convertCaseClassParam)
 
+      def convertCaseClass(caseClass: ClassDef): ClassDef = {
+        val Name: TypeName = TypeName(s"${caseClass.name}F")
+
+        val params: List[ValDef] = getCaseClassParams(caseClass)
+
         q"case class $Name[..${clait.tparams}, $A](..$params) extends $NonRecursiveAdtFullName"
       }
 
-      val NonRecursiveAdtCases: List[Tree] =
+      val NonRecursiveAdtCases: List[ClassDef] =
         AdtCases.map {
           case c: ModuleDef => convertCaseObject(c)
           case c: ClassDef  => convertCaseClass(c)
@@ -92,11 +101,64 @@ implicit def functorInstance[..${clait.tparams}]: cats.Functor[({ type λ[α] = 
 """
       }
 
+      val toRecursive: ValDef = {
+        val embedAlgebraCases: List[CaseDef] =
+          (NonRecursiveAdtCases zip AdtCases) map {
+            case (origin, target: ClassDef) =>
+              val originName = TermName(origin.name.toString)
+              val targetName = TermName(target.name.toString)
+              val freshTerms = List.fill(getCaseClassParams(target).length)(TermName(c.freshName))
+              val binds      = freshTerms.map(x => Bind(x, Ident(termNames.WILDCARD)))
+              val args       = freshTerms.map(x => Ident(x))
+              cq"$originName(..$binds) => $targetName[..$claitTypeParamNamesAsTrees](..$args)"
+            case (origin, target: ModuleDef) =>
+              val originName = TermName(origin.name.toString)
+              val targetName = TermName(target.name.toString)
+              cq"$originName => $targetName"
+          }
+
+        val mtch = Match(EmptyTree, embedAlgebraCases)
+
+        val algebra = q"""
+new qq.droste.GAlgebra[$NonRecursiveAdtName, ${clait.name}, ${clait.name}]($mtch)
+"""
+        q"val embedAlgebra: qq.droste.Algebra[$NonRecursiveAdtName, ${clait.name}] = $algebra"
+
+      }
+
+      val toFixedPoint: ValDef = {
+        val embedAlgebraCases: List[CaseDef] =
+          (AdtCases zip NonRecursiveAdtCases) map {
+            case (origin: ClassDef, target) =>
+              val originName = TermName(origin.name.toString)
+              val targetName = TermName(target.name.toString)
+              val freshTerms = List.fill(getCaseClassParams(target).length)(TermName(c.freshName))
+              val binds      = freshTerms.map(x => Bind(x, Ident(termNames.WILDCARD)))
+              val args       = freshTerms.map(x => Ident(x))
+
+              cq"$originName(..$binds) => $targetName[..$claitTypeParamNamesAsTrees, ${clait.name}](..$args)"
+            case (origin: ModuleDef, target) =>
+              val targetName = TermName(target.name.toString)
+              val originName = TermName(origin.name.toString)
+              cq"$originName => $targetName[..$claitTypeParamNamesAsTrees, ${clait.name}]()"
+          }
+
+        val mtch = c.untypecheck(Match(EmptyTree, embedAlgebraCases))
+
+        val algebra = q"""
+new qq.droste.GCoalgebra[$NonRecursiveAdtName, ${clait.name}, ${clait.name}]($mtch)
+"""
+        q"val projectCoalgebra: qq.droste.Coalgebra[$NonRecursiveAdtName, ${clait.name}] = $algebra"
+
+      }
+
       val fixieModule: ModuleDef = q"""
 object fixie {
   $nonRecursiveAdt
   ..$NonRecursiveAdtCases
   $functorInstance
+  $toFixedPoint
+  $toRecursive
 }
 """
 
