@@ -29,12 +29,12 @@ lazy val commonSettings = Seq(
   scalaVersion := "2.12.6",
   crossScalaVersions := Seq(scalaVersion.value, "2.11.12"),
   scalafmtOnCompile in ThisBuild := true,
-  addCompilerPlugin("org.spire-math" % "kind-projector"      % "0.9.7" cross CrossVersion.binary),
-  addCompilerPlugin("com.olegpy"     %% "better-monadic-for" % "0.2.4"),
-  addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full),
+  addCompilerPlugin("org.spire-math"  % "kind-projector"      % "0.9.7" cross CrossVersion.binary),
+  addCompilerPlugin("com.olegpy"      %% "better-monadic-for" % "0.2.4"),
+  addCompilerPlugin("org.scalamacros" % "paradise"            % "2.1.0" cross CrossVersion.full),
   libraryDependencies ++= Seq(
     "org.typelevel"     %% "cats-core"   % catsV,
-    "org.typelevel" %% "kittens" % "1.1.0",
+    "org.typelevel"     %% "kittens"     % "1.1.0",
     "io.higherkindness" %% "droste-core" % drosteV
   )
 )
