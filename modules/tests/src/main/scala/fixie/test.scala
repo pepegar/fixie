@@ -1,18 +1,5 @@
 package fixie
 
-// import cats._, cats.derived._
-
-// sealed trait MyListF[A, REC]
-// object MyList {
-//   case class ConsF[A, REC](head: A, tail: REC) extends MyListF[A, REC]
-//   case class NilF[A, REC]()                    extends MyListF[A, REC]
-
-//   implicit val fc: Functor[({ type λ[α] = MyListF[Int, α] })#λ] = {
-//     import auto.functor._
-//     semi.functor
-//   }
-// }
-
 import qq.droste._
 
 @fixie sealed trait MyList[A]
@@ -29,17 +16,30 @@ object MyIntList {
 
 object App extends App {
 
-  import MyIntList.fixie._
+  import MyIntList.fixie.{ConsF => ConsIntF, NilF => NilIntF, _}
 
   val sumList: Algebra[MyIntListF, Int] = Algebra {
-    case ConsF(head, tail) => head + tail
-    case NilF()            => 0
+    case ConsIntF(head, tail) => head + tail
+    case NilIntF()            => 0
   }
 
-  val sum = scheme.hylo(sumList.run, projectCoalgebra.run)
+  val sum = scheme.hylo(sumList.run, MyIntList.fixie.projectCoalgebra.run)
 
-  val list: MyIntList = MyIntList.Cons(1, MyIntList.Cons(2, MyIntList.Cons(3, MyIntList.Nil)))
+  val intList: MyIntList = MyIntList.Cons(1, MyIntList.Cons(2, MyIntList.Cons(3, MyIntList.Nil)))
 
-  println(s"sum : " + sum(list))
+  println(s"sum int list: " + sum(intList))
+
+  import MyList.fixie._
+
+  val concatList: Algebra[MyListF[String, ?], String] = Algebra {
+    case ConsF(head, tail) => s"$head|$tail"
+    case NilF()            => ""
+  }
+
+  val stringList = MyList.Cons("hello", MyList.Cons("dolly", MyList.Nil[String]()))
+
+  val concat = scheme.hylo(concatList.run, MyList.fixie.projectCoalgebra[String].run)
+
+  println(s"concat string list: " + concat(stringList))
 
 }
