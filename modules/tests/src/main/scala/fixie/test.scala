@@ -1,4 +1,5 @@
 package fixie
+
 // import cats._, cats.derived._
 
 // sealed trait MyListF[A, REC]
@@ -12,11 +13,13 @@ package fixie
 //   }
 // }
 
-// @fixie sealed trait MyList[A]
-// object MyList {
-//   case class Cons[A](head: A, tail: MyList[A]) extends MyList[A]
-//   case class Nil[A]()                          extends MyList[A]
-// }
+import qq.droste._
+
+@fixie sealed trait MyList[A]
+object MyList {
+  case class Cons[A](head: A, tail: MyList[A]) extends MyList[A]
+  case class Nil[A]()                          extends MyList[A]
+}
 
 @fixie sealed trait MyIntList
 object MyIntList {
@@ -24,4 +27,19 @@ object MyIntList {
   case object Nil                             extends MyIntList
 }
 
-object App extends App {}
+object App extends App {
+
+  import MyIntList.fixie._
+
+  val sumList: Algebra[MyIntListF, Int] = Algebra {
+    case ConsF(head, tail) => head + tail
+    case NilF()            => 0
+  }
+
+  val sum = scheme.hylo(sumList.run, projectCoalgebra.run)
+
+  val list: MyIntList = MyIntList.Cons(1, MyIntList.Cons(2, MyIntList.Cons(3, MyIntList.Nil)))
+
+  println(s"sum : " + sum(list))
+
+}

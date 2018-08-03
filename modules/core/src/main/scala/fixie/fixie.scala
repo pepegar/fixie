@@ -83,17 +83,18 @@ object fixieMacro {
     val nonRecursiveAdt: ClassDef =
       q"""sealed trait $NonRecursiveAdtName[..${clait.tparams}, $A] extends Product with Serializable"""
 
+    val λ: TypeDef = q"type λ[α] = $NonRecursiveAdtName[..${clait.tparams.map(_.name)}, α]"
+
     val functorInstance = {
       q"""
-implicit def functorInstance[..${clait.tparams}]: cats.Functor[({ type λ[α] = $NonRecursiveAdtName[..${clait.tparams
-        .map(_.name)}, α] })#λ] = {
+implicit def functorInstance[..${clait.tparams}]: cats.Functor[({ $λ })#λ] = {
   import cats.derived._, auto.functor._
   semi.functor
 }
 """
     }
 
-    val toRecursive: ValDef = {
+    val toRecursive: DefDef = {
       val embedAlgebraCases: List[CaseDef] =
         (NonRecursiveAdtCases zip AdtCases) map {
           case (origin, target: ClassDef) =>
@@ -112,13 +113,13 @@ implicit def functorInstance[..${clait.tparams}]: cats.Functor[({ type λ[α] = 
       val mtch = Match(EmptyTree, embedAlgebraCases)
 
       val algebra = q"""
-new qq.droste.GAlgebra[$NonRecursiveAdtName, ${clait.name}, ${clait.name}]($mtch)
+new qq.droste.GAlgebra[({ $λ })#λ, ${clait.name}[..$claitTypeParamNames], ${clait.name}[..$claitTypeParamNames]]($mtch)
 """
-      q"val embedAlgebra: qq.droste.Algebra[$NonRecursiveAdtName, ${clait.name}] = $algebra"
+      q"def embedAlgebra[..${clait.tparams}]: qq.droste.Algebra[({ $λ })#λ, ${clait.name}[..$claitTypeParamNames]] = $algebra"
 
     }
 
-    val toFixedPoint: ValDef = {
+    val toFixedPoint: DefDef = {
       val embedAlgebraCases: List[CaseDef] =
         (AdtCases zip NonRecursiveAdtCases) map {
           case (origin: ClassDef, target) =>
@@ -128,20 +129,26 @@ new qq.droste.GAlgebra[$NonRecursiveAdtName, ${clait.name}, ${clait.name}]($mtch
             val binds      = freshTerms.map(x => Bind(x, Ident(termNames.WILDCARD)))
             val args       = freshTerms.map(x => Ident(x))
 
-            cq"$originName(..$binds) => $targetName[..$claitTypeParamNamesAsTrees, ${clait.name}](..$args)"
+            cq"$originName(..$binds) => $targetName[..$claitTypeParamNamesAsTrees, ${clait.name}[..$claitTypeParamNames]](..$args)"
           case (origin: ModuleDef, target) =>
             val targetName = TermName(target.name.toString)
             val originName = TermName(origin.name.toString)
-            cq"$originName => $targetName[..$claitTypeParamNamesAsTrees, ${clait.name}]()"
+            cq"$originName => $targetName[..$claitTypeParamNamesAsTrees, ${clait.name}[..$claitTypeParamNames]]()"
         }
 
       val mtch = c.untypecheck(Match(EmptyTree, embedAlgebraCases))
 
       val algebra = q"""
-new qq.droste.GCoalgebra[$NonRecursiveAdtName, ${clait.name}, ${clait.name}]($mtch)
+new qq.droste.GCoalgebra[({ $λ })#λ, ${clait.name}[..$claitTypeParamNames], ${clait.name}[..$claitTypeParamNames]]($mtch)
 """
-      q"val projectCoalgebra: qq.droste.Coalgebra[$NonRecursiveAdtName, ${clait.name}] = $algebra"
+      q"def projectCoalgebra[..${clait.tparams}]: qq.droste.Coalgebra[({ $λ })#λ, ${clait.name}[..$claitTypeParamNames]] = $algebra"
+    }
 
+    val basisInstance: DefDef = {
+      q"""
+implicit def basisInstance[..${clait.tparams}]: qq.droste.Basis[({ $λ })#λ, ${clait.name}[..$claitTypeParamNames]] =
+  qq.droste.Basis.Default(embedAlgebra, projectCoalgebra)
+"""
     }
 
     val fixieModule: ModuleDef = q"""
@@ -151,6 +158,7 @@ object fixie {
   $functorInstance
   $toFixedPoint
   $toRecursive
+  $basisInstance
 }
 """
 
@@ -173,6 +181,8 @@ object fixie {
         case _ =>
           sys.error("@fixie should only annotate sealed traits or sealed abstract classes")
       }
+
+    println(outputs)
 
     c.Expr[Any](Block(outputs, Literal(Constant(()))))
   }
