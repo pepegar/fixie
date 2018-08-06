@@ -5,11 +5,26 @@ parametrized ones.  This gives you the possibility to use recursion
 schemes on traditional ADTs withouth the hassle of transforming it
 manually, all the boilerplate is done by fixie.
 
+Fixie uses on [cats][] for functional programming, [kittens][] for
+typeclass derivation, and [droste][] for recursion schemes.
+
+[cats]: https://github.com/typelevel/cats
+[kittens]: https://github.com/typelevel/kittens
+[droste]: https://github.com/andyscott/droste
+
+## Motivation
+
+The idea behind fixie is to provide an easy way of applying [recursion
+schemes][droste] to recursive data types you already have in your
+program.
+
 ## Example
 
 Let's see this example of a list implemented recursively.
 
 ``` scala
+import fixie._
+
 @fixie sealed trait MyList[A]
 object MyList {
   case class Cons[A](head: A, tail: MyList[A]) extends MyList[A]
